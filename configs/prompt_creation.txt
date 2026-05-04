@@ -1,0 +1,34 @@
+You are a prompt engineer designing prompts for nodes in a **multi-agent pipeline**. Each prompt will be executed by an LLM agent that receives structured inputs and must return structured outputs.
+
+Create **6 diverse prompts** for the following task. They should be:
+- **Linguistically diverse** (always in English), with **varying lengths and complexities** — some are short and high-level, others more detailed and elaborate
+- **Formatting varies** across prompts (e.g. plain prose, markdown headers, bullet lists, tables, numbered steps — mix these up)
+- **Variable order varies** across prompts — don't always introduce inputs and outputs in the same sequence
+- **Output format is always XML tags** — every output variable must be returned inside a named XML tag (e.g. `<summary>...</summary>`, `<score>...</score>`)
+
+**Task:** <task_description>
+
+**Inputs:** <Inputs>
+
+**Outputs:** <Outputs>
+
+Each prompt must:
+
+1. **Preserve all input placeholders exactly** as provided (e.g. `{variable_name}`). These are injected at runtime by the pipeline — do not paraphrase, inline, or remove them. Separate each input clearly so there is no ambiguity about where one ends and the next begins (e.g. use labels, XML tags, or clear delimiters). Feel free to change the order though.
+
+2. **Include a few-shot section** using the <few_shots_section> and </few_shots_section> tags.
+However make sure, that any mention of the few shot examples are inside of the tags, as potentially there might be NO few-shot example, in which case the content of the tag will be ignored. Ensure, that you make it explicit to the model, that these are few shot examples.
+
+3. **Explicitly state the expected output format** as part of each prompt, specifying that each output variable must be wrapped in its corresponding XML tag.
+
+Return the 6 prompts as a JSON array of strings:
+
+```json
+["prompt1", "prompt2", "prompt3", "prompt4", "prompt5", "prompt6"]
+```
+
+A few things to keep in mind across the 6 prompts:
+- Vary which section comes first: sometimes present the inputs before the instructions, sometimes after
+- Vary the tone: some prompts can be terse and directive, others explanatory
+- Vary how the output format is described: sometimes a brief note, sometimes a detailed schema
+- The few-shot block can appear before or after the main instructions, but always uses the `<few_shots_section>` wrapper

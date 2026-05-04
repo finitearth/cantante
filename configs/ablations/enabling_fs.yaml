@@ -1,0 +1,54 @@
+experiment:
+  name: "enabling_fs"
+  output_dir: "./results/ablations/enabling_fs/"
+  seed: 42
+  max_token_budget: 10000000
+  optimizer: "CANTANTE"
+  node_optimizer: "CAPO"
+  selector: "naive"
+  block_size: 10
+  eval_strategy: "random_block"
+  n_fs: 0
+  attributer: "unconstrained"
+  eval_max_workers: 8
+  eval_timeout_sec: 180
+  recursion_limit: 30
+  dataset: "gsm8k"
+  max_tokens_per_field: 128
+  n_steps: 100 # stopped by callbacks
+
+optimizer_kwargs:
+  max_n_blocks_eval: 5
+  length_penalty: 0.05
+  crossovers_per_iter: 4 # changed to align with group size
+  alpha: 0.2
+  upper_shots: 0
+
+attributer_kwargs: {}
+
+task_llm_kwargs:
+  model: "qwen-30b-a3b-llmlb"
+  base_url: "https://openwebui.uni-freiburg.de/api"
+  model_provider: "openai"
+  max_tokens: 512
+  temperature: 0.7
+  requests_per_second: 4
+  max_bucket_size: 4
+  timeout: 100
+  max_retries: 3
+
+meta_llm_kwargs:
+  model: "gpt-oss-120b-llmlb"
+  base_url: "https://openwebui.uni-freiburg.de/api"
+  model_provider: "openai"
+  max_tokens: 8192
+  temperature: 0.1
+  requests_per_second: 2
+  max_bucket_size: 1
+  timeout: 180
+  max_retries: 3
+
+setup_dict_folder: "configs/setups"
+
+grid:
+  attributer_kwargs.group_size: [2, 5] # VARYING GROUP SIZE FOR ATTRIBUTER

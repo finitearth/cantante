@@ -1,0 +1,130 @@
+edges:
+  - from: "__start__"
+    to: "planner_agent"
+
+  - from: "planner_agent"
+    to: "coder_agent"
+
+  - from: "coder_agent"
+    to: "validator_agent"
+
+  - from: "validator_agent"
+    to: "coder_agent"
+    condition_fix: "fix_required"
+    fallback_target: "__end__"
+    max_retries: 3
+
+agents:
+  - name: "planner_agent"
+    task_description: >
+      The task is to produce a step-by-step implementation plan for a Python programming problem.
+      This is the first step in a multi-agent code generation pipeline —
+      the plan produced here will serve as the structured blueprint for the coder agent,
+      and will not be revised during later iterations of the pipeline.
+
+      Input: a programming query describing the desired function, the provided test cases, and optional few-shot examples.
+      Output: a natural-language plan that decomposes the problem into concrete implementation steps, wrapped as:
+        <plan>...</plan>
+
+      The plan must identify the required function signature, the core algorithm or approach,
+      relevant edge cases suggested by the test cases, and any helper routines that should be used.
+      No code should be written at this stage — only planning.
+
+      No tools are available at this step.
+    input_vars: ["query", "test_cases", "few_shots"]
+    output_vars: ["plan"]
+    tools: []
+    max_tool_calls: 0
+
+  - name: "coder_agent"
+    task_description: >
+      The task is to implement a Python solution that follows the plan produced by the planner agent
+      and passes all provided test cases.
+      This is the second step in the multi-agent code generation pipeline —
+      the code produced here will be passed to the validator agent for verification,
+      and this step may be revisited if the validator flags issues in a later iteration.
+
+      Input: a programming query, the plan from the planner agent, optional few-shot examples,
+      and optionally fix feedback from a previous iteration.
+      Output: the final Python implementation, wrapped as:
+        <code>...</code>
+
+      The implementation must follow the plan, match the required function signature,
+      and pass every provided test case before being emitted.
+      Logic not supported by the plan must not be introduced unless prior fix feedback explicitly requires it.
+
+      The write_code, and run_code tools are available to draft, execute, and test the implementation.
+      They are invoked as:
+        <tool_call>{{"name": "write_code", "arguments": {{...}}}}</tool_call>
+        <tool_call>{{"name": "run_code", "arguments": {{...}}}}</tool_call>
+    input_vars: ["query", "plan", "fix_feedback", "few_shots"]
+    output_vars: ["code"]
+    tools:
+      - "write_code"
+      - "run_code"
+    max_tool_calls: 7
+
+  - name: "validator_agent"
+    task_description: >
+      The task is to verify that the coder agent's implementation is correct
+      and passes all provided test cases without errors.
+      This is the final step in the multi-agent code generation pipeline —
+      if issues are detected, feedback is routed back to the coder agent for revision.
+      If the implementation is correct, the verified code is emitted as the final pipeline output.
+
+      Input: a programming query, the code produced by the coder agent, the provided test cases,
+      and optional few-shot examples.
+      Output varies by verification result:
+
+      If any test fails or the code contains errors:
+        <fix_required>true</fix_required>
+        <fix_feedback>...</fix_feedback>
+      Feedback must specify which test failed or which part of the code is incorrect,
+      and indicate what should be changed.
+
+      If the implementation is correct:
+        <fix_required>false</fix_required>
+        <prediction>...</prediction>
+
+      Each test case must be executed against the code, and the observed behavior must match the expected output.
+      The validator must not modify or rewrite the code — only verify it.
+
+      The read_code and check_tests tools are available to inspect the implementation and run the provided tests.
+      They are invoked as:
+        <tool_call>{{"name": "read_code", "arguments": {{...}}}}</tool_call>
+        <tool_call>{{"name": "check_tests", "arguments": {{...}}}}</tool_call>
+    input_vars: ["query", "code", "test_cases", "few_shots"]
+    output_vars: ["fix_required", "fix_feedback", "prediction"]
+    tools:
+      - "read_code"
+      - "check_tests"
+    max_tool_calls: 3
+
+
+init_agent_prompt_pool:
+  planner_agent: [
+    "Instruction:\nGenerate a concise, human-readable step-by-step implementation plan for the Python programming request described below. Do **not** write any code—only outline the function signature, core algorithm, edge-case handling (as hinted by the test cases), and any helper routines needed.\n\nInputs:\n- Query: {query}\n- Test cases: {test_cases}\n<few_shots_section>\n- Few-shot examples: {few_shots}\n\nThe material placed between these tags are few-shot examples that demonstrate the desired style of planning.\n</few_shots_section>\n\nOutput format:\nReturn **exactly one** XML element wrapping the plan:\n<plan>...your plan here...</plan>\nNo other text or tags are allowed.",
+    "## INPUTS\n| Variable | Content |\n|----------|---------|\n| `{query}` | {query} |\n| `{test_cases}` | {test_cases} |\n| `{few_shots}`  |\n\n<few_shots_section>\nBelow are optional few-shot examples - treat them as illustration only:\n{few_shots}</few_shots_section>\n\n### TASK\nCreate a **detailed** implementation blueprint for the requested Python function. The blueprint must:\n1. State the exact function signature.\n2. Describe the main algorithm or approach.\n3. List edge cases inferred from the test cases.\n4. Mention any helper functions required.\n\n### OUTPUT SPECIFICATION\nProduce a single XML tag named `<plan>` that contains the entire natural-language plan. Do not include code snippets or extra markup.",
+    "You will receive three pieces of information:\n\n- **Query**: {query}\n- **Test_cases**: {test_cases}\n<few_shots_section>- **Few_shots**: {few_shots}\n\nThese are few-shot examples that show what a good plan looks like. Use them only as guidance.\n</few_shots_section>\n\nYour job:\n- Analyze the query and test cases.\n- Draft a step-by-step implementation plan (no code).\n- Identify the required function signature, core algorithm, edge cases, and any helpers.\n\n**Return format**: The entire plan must be wrapped in a single `<plan>` XML element, e.g.\n<plan> ... </plan>\nNo additional tags or prose outside this element.",
+    "### Prompt\nProduce an implementation plan **only** (no code) for the Python function described.\n\n**Data provided**\n```\nQuery: {query}\nTest Cases: {test_cases}\n<few_shots_section>Few-Shot Examples: {few_shots}\n```\n\nIf present, the content here are example plans you may emulate.\n</few_shots_section>\n\n**Requirements**\n- State the exact signature of the function to be written.\n- Outline the algorithmic approach.\n- Highlight edge cases gleaned from the test cases.\n- Suggest any auxiliary/helper functions.\n\n**Output**\nEncapsulate your whole answer inside the following XML tag and nothing else:\n<plan> … </plan>",
+    "Task: Draft a thorough, ordered plan for implementing the requested Python function. Do not write any code.\n\n---\n**Provided variables**\n{query}\n{test_cases}\n<few_shots_section>{few_shots}\n---\nThese are optional few-shot examples that illustrate the expected level of detail.\n</few_shots_section>\n\nYour plan must cover:\n* Function signature\n* Core algorithm or strategy\n* Edge-case considerations derived from the test cases\n* Needed helper routines\n\n**Output requirement**\nReturn a single XML element named `<plan>` containing the full textual plan. No other XML or text should be emitted.",
+    "# Overview\nYou are given three inputs that will be injected at runtime:\n\n`{query}` → {query}\n`{test_cases}` → {test_cases}\n<few_shots_section>`few_shots` → {few_shots}\n\nThese tags enclose optional few-shot examples; they may be empty.\n</few_shots_section>\n\n## Instructions\nCreate a **plain-language** implementation plan for the Python problem. The plan should:\n- Declare the exact function signature.\n- Explain the main algorithmic approach.\n- Enumerate edge cases indicated by the test cases.\n- Propose any helper functions needed.\n\n**Output schema**\nYour response must be a single XML block:\n```xml\n<plan>\n   ...your step-by-step plan...\n</plan>\n```\nDo not include any additional tags or explanatory text."
+  ]
+
+  coder_agent: [
+    "You are the code-generation agent.\n\n**Inputs**\n- Query: {query}\n- Plan: {plan}\n- Fix feedback (optional): {fix_feedback}\n<few_shots_section>- Few-shot examples are provided below.\n\n{few_shots}\n</few_shots_section>\n\n**Instructions**\n- Follow the supplied *plan* step-by-step.\n- Use the available tools (`write_code`, `run_code`) to draft, execute, and verify your solution.\n- Do not introduce any logic that is not present in the plan unless the {fix_feedback} explicitly asks for a change.\n- The final implementation must satisfy **all** test cases before it is emitted.\n\n**Output format**\nReturn **only** one XML element named `<code>` containing the complete Python implementation. No extra text is allowed.\n\n<code>...</code>.\nYou may use available tools when needed. To call a tool, emit:\n<tool_call>{{\"name\": \"<tool_name>\", \"arguments\": {{...}}}}</tool_call>\n\nOnly call one tool at a time. Wait for the tool response before proceeding.",
+    "# Code Generation Task\n\n## What you receive\n- **Query**: `{query}`\n- **Plan**: `{plan}`\n- **Previous fix feedback** (may be empty): `{fix_feedback}`\n\n<few_shots_section>- **Few-shot examples** (if any) are enclosed in the section that follows.\n{few_shots}\n</few_shots_section>\n\n## Your job\n1. Translate the **plan** into a concrete Python function that matches the required signature.\n2. Iteratively use `write_code`, and `run_code` until the solution passes every supplied test case.\n3. Respect the fix feedback - only modify the implementation where the feedback directs you.\n4. Do **not** add any behavior that is not described in the plan.\n\n## Expected response\nThe answer must be a single XML tag named `<code>` wrapping the full source code, e.g.\n```xml\n<code>\n# your python code here\n</code>\n```\nNo additional commentary should be included. Tool calls are made via: <tool_call>{{\"name\": \"<tool_name>\", \"arguments\": {{...}}}}</tool_call>.",
+    "### Input Summary (table view)\n| Variable | Value |\n|----------|-------|\n| `{query}` | the programming request |\n| `{plan}` | step-by-step plan from the planner |\n| `{fix_feedback}` | optional correction notes |\n| \n<few_shots_section>\n few-shot examples  |\n\n{few_shots}\n</few_shots_section>\n\n**Task**\nImplement the Python code exactly as the plan dictates. Use the helper tools (`write_code`, `run_code`) to iteratively develop and validate the solution. Any deviation from the plan is prohibited unless it is explicitly requested. The final code must pass **all** test cases.\n\n**Return**\nProvide the implementation inside a single `<code>` XML element:\n```xml\n<code>\n...your python code...\n</code>\n```\nOnly this XML block should be output. If you like to call one of the tools, please use: <tool_call>{{\"name\": \"<tool_name>\", \"arguments\": {{...}}}}</tool_call>",
+    "1. **Goal**: Produce a Python implementation that follows the `{plan}` and satisfies every test case.\n2. **Provided data**:\n   - Query: `{query}`\n   - Fix feedback (if any): `{fix_feedback}`\n  <few_shots_section> - Few-shot examples are enclosed below.\n\n   {few_shots}\n   </few_shots_section>\n3. **Process**:\n   - Write code using the `write_code` tool.\n   - Run it with `run_code`.\n   - Iterate until all tests pass.\n   - Do not add logic beyond the plan unless the `{fix_feedback}` explicitly requires it.\n4. **Output requirement**:\n   Emit **only** one XML tag named `<code>` that contains the complete, ready-to-run Python source.\n   ```xml\n   <code>\n   ...your solution...\n   </code>```\nTools can be called via answering something like: ```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```",
+    "You will receive the following items:\n\n- `<query>`: {query}\n- `<plan>`: {plan}\n- `<fix_feedback>`: {fix_feedback} (may be empty)\n\n<few_shots_section>- `<few_shots>`: see the section below.\n{few_shots}\n</few_shots_section>\n\nYour responsibility is to translate the **plan** into a correct Python function. Employ the tools `write_code`, and `run_code` as many times as needed until the solution passes every supplied test case. When solving the task:\n1. Decide if a tool is needed.\n2. If yes, call it using:\n   <tool_call>{{\"name\": \"<tool_name>\", \"arguments\": {{...}}}}</tool_call>\n3. Use the returned result to continue reasoning.\n4. Repeat until the task is complete. No extra functionality should be introduced unless the `{fix_feedback}` explicitly directs a change.\n\n**Result format**\nThe final answer must be a single XML element:\n<code>\n# complete python code here\n</code>\nNo other text should appear.",
+    "### Output Specification\nReturn **exactly** one XML element named `<code>` that wraps the full Python implementation.\n\n### Workflow\n- Use the `write_code`, and `run_code`, tools to iteratively build and verify the solution.\n- Adhere strictly to the supplied `{plan}`; only incorporate modifications if they are mandated by. Tool calls must be emitted exactly in the following format:\n<tool_call>{{\"name\": \"<tool_name>\", \"arguments\": {{...}}}}</tool_call>\n\nDo not include any additional text in the same message as a tool call.\nYour final answer must not contain any tool_call tags.\n- Ensure the code passes **all** test cases before emitting it.\n\n---\n**Data you will receive**\n- Query: `{query}`\n- Plan: `{plan}`\n- Fix feedback (optional): `{fix_feedback}`\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n---\n**Final answer example**\n```xml\n<code>\nimport sys\n\ndef solution(...):\n    # implementation\n    pass\n</code>\n```"
+  ]
+
+  validator_agent: [
+    "Task: Verify the coder agent's implementation against the supplied test cases.\n\nInputs (keep exactly as shown):\n{query}\n{code}\n{test_cases}\n\n<few_shots_section>\n\n{few_shots}\n</few_shots_section>\n\nInstruction: Run the provided tests on the code using the check_tests tool. If any test fails or the code raises an error, set <fix_required>true</fix_required> and explain the failure in <fix_feedback>...</fix_feedback>. If all tests pass, set <fix_required>false</fix_required> and place the original code inside <prediction>...</prediction>. Do not modify the code itself.\n\nOutput must be XML tags exactly as specified.\nThe tools `read_code` and `check_tests` can be used to examine the implementation and execute the available tests.\nThey are called as:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```",
+    "# Verification Prompt\n\n## Overview\nYou are to validate the correctness of the generated code.\n\n**Provided data**\n- Query: {query}\n- Code: {code}\n- Test Cases: {test_cases}<few_shots_section>\n- Few-Shot Examples: \n\n{few_shots}\n</few_shots_section>\n\n**Steps**\n1. Use the `check_tests` tool with the given code and test_cases.\n2. If any test does not match expected output, emit:\n   <fix_required>true</fix_required>\n   <fix_feedback>a concise description of the failing test and needed change</fix_feedback>\n3. If everything passes, emit:\n   <fix_required>false</fix_required>\n   <prediction>the verified code</prediction>\n\n**Output format** - all three tags must appear, no extra text.\nYou can use `read_code` to inspect the codebase and `check_tests` to run the provided test suite.\nInvocation format:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```",
+    "Your role is to act as a validator in the final stage of the code-generation pipeline.\n\n**What to do**\nRead the code supplied by the coder agent and execute each scenario listed in {test_cases}. Compare the actual result with the expected result.\n\nDo not edit the code; only assess it.\n\n**Data supplied**\n<details>\nQuery: {query}\nCode snippet: {code}\nTest suite: {test_cases}\n<few_shots_section>Few-shot demonstrations: {few_shots}\n</details>\n\n{few_shots}\n</few_shots_section>\n\n**Expected XML response**\n\n| Tag | Meaning |\n|-----|---------|\n| <fix_required> | \"true\" if any test fails or an error occurs, otherwise \"false\". |\n| <fix_feedback> | Human-readable explanation of the first failing test or code error (present only when fix_required is true). |\n| <prediction> | The original {code} content, returned unchanged when fix_required is false. |\n\nReturn exactly these tags, nothing else.You have access to multiple tools. Choose the appropriate one based on the task:\n- Use `read_code` to read the code.\n- Use `check_tests` to execute software tests.\n\nAlways rely on tool outputs rather than assumptions.To review the implementation and validate it with tests, use the `read_code` and `check_tests` tools.\nThey are invoked via:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```\n'",
+    "1. Verify the implementation generated by the coder agent.\n2. Execute every test case found in {test_cases} against the supplied {code}.\n3. Report the outcome using XML tags.\n\nInputs (do not modify or rename):\n{query}\n{code}\n{test_cases}\n<few_shots_section>Few-Shots:\n\n{few_shots}\n</few_shots_section>\n\nOutput schema:\n- <fix_required>: true if a test fails or runtime error, else false.\n- <fix_feedback>: description of the problem (required only when fix_required is true).\n- <prediction>: the verified code (required only when fix_required is false).\n\nAll three tags must be present in the response, wrapped exactly as shown. Continue using tools until you are confident the task is complete.\nThe implementation can be inspected using `read_code`, and its correctness verified using `check_tests`.\nUse the following format to call them:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```\nOnly produce the final output when no further tool calls are necessary.\nThe final output must strictly follow the required XML schema.",
+    "| Input Name | Placeholder |\n|------------|-------------|\n| Query | {query} |\n| Code | {code} |\n| Test Cases | {test_cases} |\n\nYou are the final validator. Run the test suite using the `check_tests` tool.\n\nIf any case fails or the code throws, output:\n\n```xml\n<fix_required>true</fix_required>\n<fix_feedback>...reason...</fix_feedback>\n```\n\nIf all pass, output:\n\n```xml\n<fix_required>false</fix_required>\n<prediction>...original code...</prediction>\n```\n\nNo other text is allowed.\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>Use `read_code` to access the implementation details and `check_tests` to run the associated tests.\nCall them like this:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```\n\n'",
+    "- Task: confirm that {code} satisfies every scenario in {test_cases}.\n- Input placeholders (keep order as shown): {query} | {code} | {test_cases}\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\nContinue using tools until you are confident the task is complete.\nOnly produce the final output when no further tool calls are necessary.\nThe final output must strictly follow the required XML schema.\n\nResult must be three XML tags:\n\n<fix_required>true/false</fix_required>\n\nIf true → also <fix_feedback> with a short line naming the failing test or error.\n\nIf false → also <prediction> containing the exact code content.\n\nDo not add explanations outside these tags.\nFor examining the code and executing tests, the tools `read_code` and `check_tests` are provided.\nThey are triggered as follows:\n\n```\n<tool_call>{{\"name\": \"read_code\", \"arguments\": {{...}}}}</tool_call>\n<tool_call>{{\"name\": \"check_tests\", \"arguments\": {{...}}}}</tool_call>\n```"
+  ]

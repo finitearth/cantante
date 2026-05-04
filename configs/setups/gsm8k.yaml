@@ -1,0 +1,136 @@
+edges:
+  - from: "__start__"
+    to: "executor_1"
+
+  - from: "__start__"
+    to: "executor_2"
+
+  - from: "__start__"
+    to: "executor_3"
+
+  - from: "executor_1"
+    to: "consensus_agent"
+
+  - from: "executor_2"
+    to: "consensus_agent"
+
+  - from: "executor_3"
+    to: "consensus_agent"
+
+  - from: "consensus_agent"
+    to: "__end__"
+
+
+agents:
+  - name: "executor_1"
+    task_description: >
+      The task is to solve a mathematical query through step-by-step reasoning and produce a proposed answer.
+      This agent runs in parallel with executor_2 and executor_3 — all three independently solve the same query,
+      and their proposals are passed to the consensus agent to determine the final answer.
+
+      Input: a mathematical query and optional few-shot examples.
+      Output: a numerical answer and a justification for the solution, wrapped as:
+        <proposal_1>...</proposal_1>
+        <justification_1>...</justification_1>
+      The proposal must contain only a numerical value — no units or additional text.
+
+      No tools are available at this step.
+    input_vars: ["query", "few_shots"]
+    output_vars: ["proposal_1", "justification_1"]
+    tools: []
+    max_tool_calls: 0
+
+  - name: "executor_2"
+    task_description: >
+      The task is to solve a mathematical query through step-by-step reasoning and produce a proposed answer.
+      This agent runs in parallel with executor_1 and executor_3 — all three independently solve the same query,
+      and their proposals are passed to the consensus agent to determine the final answer.
+
+      Input: a mathematical query and optional few-shot examples.
+      Output: a numerical answer and a justification for the solution, wrapped as:
+        <proposal_2>...</proposal_2>
+        <justification_2>...</justification_2>
+      The proposal must contain only a numerical value — no units or additional text.
+
+      No tools are available at this step.
+    input_vars: ["query", "few_shots"]
+    output_vars: ["proposal_2", "justification_2"]
+    tools: []
+    max_tool_calls: 0
+
+  - name: "executor_3"
+    task_description: >
+      The task is to solve a mathematical query through step-by-step reasoning and produce a proposed answer.
+      This agent runs in parallel with executor_1 and executor_2 — all three independently solve the same query,
+      and their proposals are passed to the consensus agent to determine the final answer.
+
+      Input: a mathematical query and optional few-shot examples.
+      Output: a numerical answer and a justification for the solution, wrapped as:
+        <proposal_3>...</proposal_3>
+        <justification_3>...</justification_3>
+      The proposal must contain only a numerical value — no units or additional text.
+
+      No tools are available at this step.
+    input_vars: ["query", "few_shots"]
+    output_vars: ["proposal_3", "justification_3"]
+    tools: []
+    max_tool_calls: 0
+
+  - name: "consensus_agent"
+    task_description: >
+      The task is to aggregate three independently produced proposals into one final prediction.
+
+      This is the final step in the pipeline. The agent is an aggregator, not a solver. It must not solve the mathematical query from scratch, extend the reasoning independently, or produce a new derivation. Its role is only to compare the provided proposals and justifications and select the best-supported final answer.
+
+      Input: a mathematical query, three proposed numerical answers and their corresponding justifications from executor_1, executor_2, and executor_3, and optional few-shot examples.
+
+      Output: exactly one final numerical answer, wrapped as:
+      <prediction>...</prediction>
+
+      The prediction must contain only a numerical value, with no units, no explanation, and no additional text.
+
+      The decision must be based only on the provided proposals and justifications.
+
+      No tools are available at this step.
+    input_vars: ["query", "proposal_1", "justification_1", "proposal_2", "justification_2", "proposal_3", "justification_3", "few_shots"]
+    output_vars: ["prediction"]
+    tools: []
+    max_tool_calls: 0
+
+init_agent_prompt_pool:
+  executor_1: [
+    "### Task\nSolve the given mathematical query step-by-step and propose a numerical answer.\n\n**Input**\n- Query: `{query}`<few_shots_section>\n- Few-shot examples: `{few_shots}`</few_shots_section>\n\n**Output Requirements**\nReturn **exactly** two XML elements:\n```xml\n<proposal_1>NUMERIC_ANSWER</proposal_1>\n<justification_1>YOUR_REASONING</justification_1>\n```\nThe `<proposal_1>` tag must contain only the number, no units or extra text. Provide a clear justification inside `<justification_1>`.\n\nNo external tools are allowed.",
+    "# Mathematical Query Solver\n\n**Instructions**\n1. Read the problem.\n2. Perform a detailed, step-by-step calculation.\n3. Output the final numeric result and a concise justification.\n\n**Provided Data**\n- Problem: `{query}`<few_shots_section>`\n- Example demonstrations: `{few_shots}`</few_shots_section>\n\n**Required Output Format**\n```xml\n<proposal_1>NUMBER</proposal_1>\n<justification_1>EXPLANATION</justification_1>\n```\nOnly the number belongs inside `<proposal_1>`. Do not include units or commentary. Use no external tools.",
+    "--- INPUT SECTION ---\nQuery: `{query}`<few_shots_section>\nExamples: {few_shots}</few_shots_section>\n--- END INPUT ---\n\n--- INSTRUCTION ---\nSolve the query analytically. After solving, produce two XML tags as described below.\n\n--- OUTPUT SCHEMA ---\n| Tag            | Content Description                               |\n|----------------|---------------------------------------------------|\n| `<proposal_1>` | The final answer as a plain number (no units).   |\n| `<justification_1>` | A clear, step-by-step reasoning leading to the answer. |\n\nRemember: no tools may be used. Provide the XML exactly as shown.",
+    "Please follow these steps to answer the mathematical query:\n\n1. Examine the `{query}`.\n2. If `{few_shots}` examples are provided, review them (they appear inside the `<few_shots_section>` block).\n3. Solve the problem manually, showing your reasoning.\n4. Output the result.<few_shots_section>\n\n--- Data ---\n{few_shots}</few_shots_section>\nQuery: `{query}`\n\n--- Output ---\nReturn exactly:\n<proposal_1>...</proposal_1>\n<justification_1>...</justification_1>\n\nThe first tag must contain **only** the numeric answer. No units, no extra text.",
+    "<few_shots_section>{few_shots}</few_shots_section>\n\n**Query to solve:** `{query}`\n\nYou are an expert mathematician. Using the examples above (if any) as guidance, work through the problem step-by-step. After completing your calculations, respond with the following XML structure:\n\n<proposal_1>numeric answer</proposal_1>\n<justification_1>detailed reasoning</justification_1>\n\nImportant: The `<proposal_1>` element must contain only the number, and no external tools are permitted.",
+    "**Task:** Compute the answer to `{query}`.<few_shots_section>\n\n**Few-shot examples:** `{few_shots}`</few_shots_section>\n\n**What to return**\n- `<proposal_1>` - a single number (the answer)\n- `<justification_1>` - a brief, logical explanation\n\nPlease present the two tags exactly as shown, with no additional characters or units. No tool usage is allowed."
+  ]
+
+
+  executor_2: [
+    "**Inputs**\n- Query: {query} <few_shots_section>\n- Few-shot examples: {few_shots}</few_shots_section>\n\n**Task**: Solve the mathematical query step-by-step. Provide the final numeric answer (no units) and a concise justification.\n\n**Output**: Return exactly two XML tags:\n```xml\n<proposal_2>your number</proposal_2>\n<justification_2>your reasoning</justification_2>\n```",
+    "## Goal\nYou will receive a math problem and optional few-shot examples. Compute the answer analytically, then output the required XML.\n\n### Provided Data\n```\nQuery: {query}\n<few_shots_section>{few_shots}</few_shots_section>\n```\n\n### Procedure\n1. Reason through the problem linearly.\n2. Write a short justification.\n\n### Expected response format\n- `<proposal_2>` - only the numeric result.\n- `<justification_2>` - explanation of the steps.\n\nBoth tags must be present and well-formed.",
+    "Inputs and instruction table:\n\n| Field | Content |\n|------|---------|\n| Query | {query} | <few_shots_section>\n| Few-shot examples |{few_shots} |</few_shots_section> \n\nYou are to **solve** the query using explicit step-by-step reasoning. After solving, output an XML snippet containing two tags:\n\n```xml\n<proposal_2>...</proposal_2>\n<justification_2>...</justification_2>\n```",
+    "<few_shots_section>### Few-shot examples \n{few_shots}</few_shots_section>\n\n### Task\nGiven the mathematical expression below, compute its value.\n\n1. Read the query: `{query}`.\n2. Perform a clear, logical derivation.\n3. Produce **exactly** two XML elements:\n   - `<proposal_2>` - the numeric answer, plain integer/float, no extra text.\n   - `<justification_2>` - the reasoning that led to the answer.\n\nDo not include any other text.",
+    "Hey LLM! 👋\nHere's what you've got:\n\n**Query:** {query}<few_shots_section>\n**Examples:** {few_shots}</few_shots_section>\n\nYour job: crunch the numbers, show your work, then spit out:\n\n```xml\n<proposal_2>NUMBER</proposal_2>\n<justification_2>YOUR REASONING</justification_2>\n```\n\nMake sure the proposal is just digits (or decimal) - no symbols, no units.",
+    "Output must be in XML.\n\n**Inputs**\n- Problem: {query}<few_shots_section>\n- Sample solutions: {few_shots}</few_shots_section>\n\n**Instruction**: Derive the answer step by step. Then return exactly:\n\n<proposal_2>...</proposal_2>\n<justification_2>...</justification_2>\n\nNo additional commentary."
+  ]
+
+  executor_3: [
+    "Task: Solve the given mathematical query using step-by-step reasoning and provide a single numeric proposal.\n\nInputs:\n- Query: {query}<few_shots_section>\n- Few-shot examples: {few_shots}</few_shots_section>\n\nOutput: Return exactly two XML elements:\n<proposal_3> numeric answer only </proposal_3>\n<justification_3> concise reasoning </justification_3>\n\nDo not include units, extra text, or any other markup.",
+    "## Mathematical Solver - Agent 3\n\n**Inputs**  \n```text\nQuery: {query}\n```<few_shots_section>\n\n{few_shots}\n</few_shots_section>\n\n### Instructions\n1. Read the query carefully.\n2. Perform a clear, step-by-step calculation.\n3. At the end, output **only** the final number inside `<proposal_3>` and a brief justification inside `<justification_3>`.\n\n#### Expected XML schema\n| Tag                | Content description                     |\n|--------------------|------------------------------------------|\n| `<proposal_3>`     | The numeric answer (no units)            |\n| `<justification_3>`| One-sentence explanation of the reasoning|\n\nMake sure the response contains only these two tags.",
+    "Compute the numeric answer for the following mathematical query.\n\nOutput must be two XML tags:\n<proposal_3>...</proposal_3>\n<justification_3>...</justification_3>\n\n**Data**\n{query}\n<few_shots_section>{few_shots}</few_shots_section>\n\nProvide a step-wise solution, then place the final number in <proposal_3> and the reasoning in <justification_3>. No extra text.",
+    "You're tasked with solving a math problem and articulating your thought process.\n\n> **Problem:** {query}\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Please**:\n- Walk through the solution logically.\n- End with the answer wrapped in `<proposal_3>` (just the number) and a short justification in `<justification_3>`.\n\n**Return format** (exactly):\n```xml\n<proposal_3>NUMBER</proposal_3>\n<justification_3>TEXT</justification_3>\n```",
+    "### Agent 3 - Mathematical Query Solver\n\n**Provided Query**\n{query}<few_shots_section>\n\n**Example demonstrations**\n{few_shots}\n</few_shots_section>\n\n**Task**: Derive the answer step by step. When finished, format your response as:\n\n<proposal_3> ... numeric result ... </proposal_3>\n<justification_3> ... brief logical justification ... </justification_3>\n\n*Do not* add any other characters, units, or commentary.",
+    "Instruction Set:\n\n1. Analyze the mathematical expression given below.\n2. Show each intermediate calculation on its own line.\n3. Conclude with two XML elements:\n   - `<proposal_3>` containing only the final number.\n   - `<justification_3>` containing a short explanation.\n\n**Query**\n{query}<few_shots_section>\n\n**Few-shot reference**\n\n{few_shots}\n</few_shots_section>\n\n**Output schema**  \n`<proposal_3>` → numeric answer (no units)  \n`<justification_3>` → one-sentence reasoning\n\nDeliver exactly these tags and nothing else."
+  ]
+
+  consensus_agent: [
+    "### Task\nYou are given a mathematical query and three candidate answers with their justifications. Compare the proposals, verify the reasoning, and output the single best numerical answer.\n\n#### Inputs\n- Query: `{query}`\n- Proposal 1: `{proposal_1}`\n- Justification 1: `{justification_1}`\n- Proposal 2: `{proposal_2}`\n- Justification 2: `{justification_2}`\n- Proposal 3: `{proposal_3}`\n- Justification 3: `{justification_3}`\n\n<few_shots_section>Here are some historic examples:\n{few_shots}\n</few_shots_section>\n\n**Output**  \nReturn only the final answer wrapped in XML: `<prediction>...</prediction>`. No extra text.",
+    "**Instruction:** Evaluate the three supplied proposals for the given query and choose the most accurate numeric result.\n\n<few_shots_section>Few-Shot Examples:\n{few_shots}\n</few_shots_section>\n\nInputs:\n{query}\nProposal #1 -> {proposal_1}\nReasoning #1 -> {justification_1}\nProposal #2 -> {proposal_2}\nReasoning #2 -> {justification_2}\nProposal #3 -> {proposal_3}\nReasoning #3 -> {justification_3}\n\nProvide the answer as XML: `<prediction>your_number</prediction>`.",
+    "Task Overview\n------------\nYou must review the following data, assess the validity of each justification, and emit a single numeric prediction.\n\nData Table:\n| Item | Content |\n|------|---------|\n| Query | {query} |\n| Proposal 1 | {proposal_1} |\n| Justification 1 | {justification_1} |\n| Proposal 2 | {proposal_2} |\n| Justification 2 | {justification_2} |\n| Proposal 3 | {proposal_3} |\n| Justification 3 | {justification_3} |\n\n<few_shots_section>Few-Shot Examples:\n{few_shots}\n</few_shots_section>\n\nSteps:\n1. Read the query.\n2. For each proposal, evaluate the justification.\n3. Select the most reliable numeric value.\n\nOutput must be exactly: `<prediction>NUMBER</prediction>`.",
+    "Compare three answers and pick the correct one.\n\nInputs:\n{query}\n{proposal_1}|{justification_1}\n{proposal_2}|{justification_2}\n{proposal_3}|{justification_3}\n\n<few_shots_section>Examples from the past:\n{few_shots}\n</few_shots_section>\n\nReturn only <prediction>value</prediction>.",
+    "## Objective\nFrom the given mathematical question and three independent solutions, determine which solution is mathematically sound and output its numeric value.\n\n### Provided Data\n- **Query:** `{query}`\n- **Solution A:** `{proposal_1}`\n  - *Reason:* `{justification_1}`\n- **Solution B:** `{proposal_2}`\n  - *Reason:* `{justification_2}`\n- **Solution C:** `{proposal_3}`\n  - *Reason:* `{justification_3}`\n\n<few_shots_section>START OF FEW SHOTS\n{few_shots}\nEND OF FEW SHOTS</few_shots_section>\n\n**Result format:** Exactly one XML element `<prediction>` enclosing the chosen number, e.g., `<prediction>42</prediction>`. No additional characters.",
+    "### Instructions\n1. Read the mathematical question.\n2. Examine each of the three proposals and their justifications.\n3. Discard any proposal whose reasoning contains errors.\n4. Output the remaining proposal's numeric answer.\n\n--- INPUT BLOCK ---\nQuery: {query}\nProposal #1 = {proposal_1}\nJustification #1 = {justification_1}\nProposal #2 = {proposal_2}\nJustification #2 = {justification_2}\nProposal #3 = {proposal_3}\nJustification #3 = {justification_3}\n--- END INPUT ---\n\n<few_shots_section>--- FEW SHOTS ---\n{few_shots}\n--- END FEW SHOTS ---</few_shots_section>\n\n**Required output**  \nThe answer must be a sole XML tag: `<prediction>NUMBER</prediction>`. Do not add commentary."
+  ]

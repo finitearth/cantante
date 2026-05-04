@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+logs/
+runs/
+# uv
+.uv-cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Notebooks
+.ipynb_checkpoints
+
+# Data
+data/*
+!data/README.md
+!data/.gitkeep
+
+# IDEs
+.idea/
+.vscode/
+
+# Custom
+
+anthropic_key.txt
+openai_key.txt
+deepinfra_key.txt
+
+token.txt
+
+data_cache/
+
+api_key.txt
+.DS_Store
+.claude

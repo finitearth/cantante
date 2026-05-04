@@ -1,0 +1,43 @@
+[project]
+name = "src"
+version = "0.1.0"
+description = "CANTANTE: Optimizing Agentic Systems via Contrastive Credit Attribution"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "numpy==2.1.3",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "jupyterlab",
+    "scipy==1.16.3",
+    "langgraph>=0.6.11",
+    "langchain>=0.3.27",
+    "datasets>=4.4.1",
+    "promptolution[api]>=2.2.0",
+    "langchain-openai>=1.0.2",
+    "seaborn>=0.13.2",
+    "pyyaml>=6.0.3",
+    "gepa>=0.0.26",
+    "dspy>=3.1.3",
+    "tiktoken>=0.12.0",
+    "pyarrow>=23.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "uv",
+    "black",
+]
+
+# --- Tool Configurations ---
+[tool.black]
+line-length = 100
+
+[tool.isort]
+line_length = 100
+profile = "black"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

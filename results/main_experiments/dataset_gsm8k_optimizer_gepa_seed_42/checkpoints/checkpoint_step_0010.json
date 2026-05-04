@@ -1,0 +1,15 @@
+{
+  "_global_step": 10,
+  "prompts": [
+    "{\"executor_1\": \"Please follow these steps to answer the mathematical query:\\n\\n1. Examine the `{query}`.\\n2. If `` examples are provided, review them (they appear inside the `\\nQuery: `{query}`\\n\\n--- Output ---\\nReturn exactly:\\n<proposal_1>...</proposal_1>\\n<justification_1>...</justification_1>\\n\\nThe first tag must contain **only** the numeric answer. No units, no extra text.\", \"executor_2\": \"**Inputs**\\n- Query: {query} \\n\\n**Task**: Solve the mathematical query step-by-step. Provide the final numeric answer (no units) and a concise justification.\\n\\n**Output**: Return exactly two XML tags:\\n```xml\\n<proposal_2>your number</proposal_2>\\n<justification_2>your reasoning</justification_2>\\n```\", \"executor_3\": \"### Agent 3 - Mathematical Query Solver\\n\\n**Provided Query**\\n{query}\\n\\n**Task**: Derive the answer step by step. When finished, format your response as:\\n\\n<proposal_3> ... numeric result ... </proposal_3>\\n<justification_3> ... brief logical justification ... </justification_3>\\n\\n*Do not* add any other characters, units, or commentary.\", \"consensus_agent\": \"Task Overview\\n------------\\nYou must review the following data, assess the validity of each justification, and emit a single numeric prediction.\\n\\nData Table:\\n| Item | Content |\\n|------|---------|\\n| Query | {query} |\\n| Proposal 1 | {proposal_1} |\\n| Justification 1 | {justification_1} |\\n| Proposal 2 | {proposal_2} |\\n| Justification 2 | {justification_2} |\\n| Proposal 3 | {proposal_3} |\\n| Justification 3 | {justification_3} |\\n\\n\\n\\nSteps:\\n1. Read the query.\\n2. For each proposal, evaluate the justification.\\n3. Select the most reliable numeric value.\\n\\nOutput must be exactly: `<prediction>NUMBER</prediction>`.\"}"
+  ],
+  "scores": [
+    0.9
+  ],
+  "_token_counts": {
+    "downstream_input": 3138831,
+    "downstream_output": 1540633,
+    "meta_input": 1073272,
+    "meta_output": 129598
+  }
+}

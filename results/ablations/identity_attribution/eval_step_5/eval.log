@@ -1,0 +1,5 @@
+05-01 16:14:32 - __main__ - WARNING - Setup finished. Starting evaluation on 1 agent prompt sets.
+05-01 16:14:32 - __main__ - WARNING - STARTING EVALUATION
+05-01 16:31:14 - __main__ - WARNING - EVAL FINISHED
+05-01 16:31:14 - __main__ - WARNING - Test scores: [0.706]
+05-01 16:31:14 - __main__ - WARNING - Token usage: {'input_tokens': 479681, 'output_tokens': 499767, 'total_tokens': 979448}

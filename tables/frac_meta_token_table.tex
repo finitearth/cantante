@@ -1,0 +1,15 @@
+\begin{table}[h]
+  \centering
+  \caption{Fraction of optimization tokens spent on meta (attribution/proposal) calls, as a percentage of total tokens used up to the token budget. Values are averaged across seeds.}
+  \label{tab:frac-meta-tokens}
+  \renewcommand{\arraystretch}{1}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Optimizer} & \textbf{MBPP} & \textbf{GSM8K} & \textbf{HotpotQA} \\
+    \midrule
+    GEPA & 24.74\,$_{\pm\phantom{0}1.56}$ & 24.19\,$_{\pm\phantom{0}5.17}$ & 23.41\,$_{\pm\phantom{0}2.15}$ \\
+    MIPROv2 & \phantom{0}0.45\,$_{\pm\phantom{0}0.18}$ & \phantom{0}0.82\,$_{\pm\phantom{0}0.06}$ & \phantom{0}0.66\,$_{\pm\phantom{0}0.09}$ \\
+    \alg{} (ours) & 25.91\,$_{\pm\phantom{0}1.49}$ & 25.55\,$_{\pm\phantom{0}1.48}$ & 20.11\,$_{\pm\phantom{0}2.25}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}

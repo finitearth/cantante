@@ -1,0 +1,15 @@
+{
+  "_global_step": 11,
+  "prompts": [
+    "{\"executor_1\": \"**Query to solve:** `{query}`\\n\\nYou are an expert mathematician. Using the examples above (if any) as guidance, work through the problem step-by-step. After completing your calculations, respond with the following XML structure:\\n\\n<proposal_1>numeric answer</proposal_1>\\n<justification_1>detailed reasoning</justification_1>\\n\\nImportant: The `<proposal_1>` element must contain only the number, and no external tools are permitted.\", \"executor_2\": \"## Goal\\nYou will receive a math problem and optional few-shot examples. Compute the answer analytically, then output the required XML.\\n\\n### Provided Data\\n```\\nQuery: {query}\\n\\n```\\n\\n### Procedure\\n1. Reason through the problem linearly.\\n2. Write a short justification.\\n\\n### Expected response format\\n- `<proposal_2>` - only the numeric result.\\n- `<justification_2>` - explanation of the steps.\\n\\nBoth tags must be present and well-formed.\", \"executor_3\": \"You're tasked with solving a math problem and articulating your thought process.\\n\\n> **Problem:** {query}\\n\\n\\n\\n**Please**:\\n- Walk through the solution logically.\\n- End with the answer wrapped in `<proposal_3>` (just the number) and a short justification in `<justification_3>`.\\n\\n**Return format** (exactly):\\n```xml\\n<proposal_3>NUMBER</proposal_3>\\n<justification_3>TEXT</justification_3>\\n```\", \"consensus_agent\": \"### Instructions\\n1. Read the mathematical question.\\n2. Examine each of the three proposals and their justifications.\\n3. Discard any proposal whose reasoning contains errors.\\n4. Output the remaining proposal's numeric answer.\\n\\n--- INPUT BLOCK ---\\nQuery: {query}\\nProposal #1 = {proposal_1}\\nJustification #1 = {justification_1}\\nProposal #2 = {proposal_2}\\nJustification #2 = {justification_2}\\nProposal #3 = {proposal_3}\\nJustification #3 = {justification_3}\\n--- END INPUT ---\\n\\n\\n\\n**Required output**  \\nThe answer must be a sole XML tag: `<prediction>NUMBER</prediction>`. Do not add commentary.\"}"
+  ],
+  "scores": [
+    0.8
+  ],
+  "_token_counts": {
+    "downstream_input": 3411200,
+    "downstream_output": 2065717,
+    "meta_input": 1289851,
+    "meta_output": 144994
+  }
+}

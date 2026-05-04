@@ -1,0 +1,19 @@
+\begin{table}[h]
+  \centering
+  \caption{Inference-time input-token usage on the evaluation sets. We report the mean number of input tokens per inference, in thousands, with standard deviation across three seeds (Bessel's correction). {\textbf{Bold}} and {\underline{underlined}} values indicate the lowest and second-lowest mean token usage for each benchmark, respectively.}
+  \label{tab:token-usage}
+  \renewcommand{\arraystretch}{1.1}
+  \resizebox{0.85\textwidth}{!}{%
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Optimizer} & \textbf{MBPP} & \textbf{GSM8K} & \textbf{HotpotQA} & \textbf{Avg Rank} \\
+    \midrule
+    Initial & \phantom{0}2.11\,$_{\pm\phantom{0}0.08}$ & \phantom{0}1.81\,$_{\pm\phantom{0}0.16}$ & \phantom{0}\textbf{1.17}\,$_{\pm\phantom{0}0.09}$ & \textbf{2.11} \\
+    GEPA & \phantom{0}2.28\,$_{\pm\phantom{0}0.36}$ & \phantom{0}\underline{1.79}\,$_{\pm\phantom{0}0.07}$ & \phantom{0}\underline{1.54}\,$_{\pm\phantom{0}0.26}$ & 2.78 \\
+    MIPROv2 & \phantom{0}\underline{2.09}\,$_{\pm\phantom{0}0.30}$ & \phantom{0}2.11\,$_{\pm\phantom{0}0.15}$ & \phantom{0}1.71\,$_{\pm\phantom{0}0.71}$ & 3.00 \\
+    \midrule
+    \alg{} (ours) & \phantom{0}\textbf{1.99}\,$_{\pm\phantom{0}0.07}$ & \phantom{0}\textbf{1.74}\,$_{\pm\phantom{0}0.04}$ & \phantom{0}2.28\,$_{\pm\phantom{0}1.02}$ & \underline{2.11} \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}

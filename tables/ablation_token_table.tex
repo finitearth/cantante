@@ -1,0 +1,24 @@
+\begin{table}[h]
+  \centering
+  \caption{Evaluation token usage per MAS invocation for ablation configurations on GSM8K, seed 42. Values are total evaluation tokens divided by the 500-sample evaluation set size, in thousands.}
+  \label{tab:ablation-tokens}
+  \renewcommand{\arraystretch}{1}
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Configuration} & \textbf{Tokens/inv (k)} \\
+    \midrule
+    Default setting & \phantom{0}1.69 \\
+    \midrule
+    Equal Steps & \phantom{0}1.66 \\
+    Equal Budget & \phantom{0}1.66 \\
+    alt. Prompt & \phantom{0}1.63 \\
+    alt. Model & \phantom{0}1.97 \\
+    w/ Few-Shots & \phantom{0}2.44 \\
+    alt. Optimizer & \phantom{0}1.83 \\
+    g = 2 & \phantom{0}1.96 \\
+    g = 5 & \phantom{0}1.65 \\
+    |DS| = \phantom{0}75 & \phantom{0}1.72 \\
+    |DS| = 150 & \phantom{0}1.66 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

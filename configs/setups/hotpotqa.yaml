@@ -1,0 +1,146 @@
+edges:
+  - from: "__start__"
+    to: "retriever"
+
+  - from: "retriever"
+    to: "reader"
+
+  - from: "reader"
+    to: "synthesizer"
+
+  - from: "synthesizer"
+    to: "hallucination_detector"
+
+  - from: "hallucination_detector"
+    to: "reader"
+    condition_fix: "hallucination_detected"
+    fallback_target: "__end__"
+    max_retries: 3
+
+agents:
+  - name: "retriever"
+    task_description: >
+      The task is to retrieve the most relevant passages from the corpus for a given query.
+      This is the first step in a multi-agent question answering pipeline —
+      the retrieved passages will serve as the grounding context for all downstream reasoning and answer generation agents.
+
+      Input: a query and optional few-shot examples.
+      Output: the selected passages, each included verbatim with its title and content, wrapped as:
+        <retrieved_passages>...</retrieved_passages>
+
+      No reasoning or answering should be performed — only passage selection.
+
+      The list_passages and retrieve_passage_by_id tools are available to search the corpus. They are invoked as:
+        <tool_call>{"name": "list_passages", "arguments": {...}}</tool_call>
+        <tool_call>{"name": "retrieve_passage_by_id", "arguments": {...}}</tool_call>
+    input_vars: ["query", "few_shots"]
+    output_vars: ["retrieved_passages"]
+    tools:
+      - "list_passages"
+      - "retrieve_passage_by_id"
+    max_tool_calls: 5
+
+  - name: "reader"
+    task_description: >
+      The task is to analyze each retrieved passage in isolation and extract facts relevant to the query.
+      This is the second step in the multi-agent question answering pipeline —
+      the passage analysis produced here will serve as the structured factual basis for the answer generation agent,
+      and may be revised if the hallucination detection agent flags issues in a later iteration.
+
+      Input: a query, the retrieved passages, optional few-shot examples,
+      and optionally hallucination feedback from a previous iteration.
+      Output: extracted facts, wrapped inside:
+        <passage_analysis>...</passage_analysis>
+
+      Every claim must be grounded in a specific retrieved passage.
+      No final answer should be produced — only per-passage analysis.
+
+    input_vars: ["query", "retrieved_passages", "hallucination_feedback", "few_shots"]
+    output_vars: ["passage_analysis"]
+    tools: []
+    max_tool_calls: 0
+
+
+  - name: "synthesizer"
+    task_description: >
+      The task is to synthesize a final answer by connecting facts across the passage analysis produced by the reader agent.
+      This is the third step in the multi-agent question answering pipeline —
+      the answer and supporting facts produced here will be passed to the hallucination detection agent for verification,
+      and this step may be revisited if hallucinations are detected.
+
+      Input: a query, the structured passage analysis from the reader agent, and optional few-shot examples.
+      Output: a final answer and the supporting facts it relies on, wrapped as:
+        <answer>...</answer>
+        <supporting_facts>...</supporting_facts>
+      Each supporting fact must reference the exact passage title and sentence it originates from.
+
+      Facts not present in the passage analysis must not be introduced.
+    input_vars: ["query", "passage_analysis", "few_shots"]
+    output_vars: ["answer", "supporting_facts"]
+    tools: []
+    max_tool_calls: 0
+
+  - name: "hallucination_detector"
+    task_description: >
+      The task is to verify that the synthesizer's answer is fully grounded in the retrieved passages.
+      This is the final step in the multi-agent question answering pipeline —
+      if hallucinations are detected, feedback is routed back to the reader and synthesizer agents for revision.
+      If the answer is fully grounded, the verified answer is emitted as the final pipeline output.
+
+      Input: a query, the retrieved passages, the proposed answer, the supporting facts cited by the synthesizer,
+      and optional few-shot examples.
+      Output varies by verification result:
+
+      If any claim is ungrounded:
+        <hallucination_detected>true</hallucination_detected>
+        <hallucination_feedback>...</hallucination_feedback>
+      Feedback must specify which claim is ungrounded and which passage should be consulted instead.
+
+      If the answer is fully grounded:
+        <hallucination_detected>false</hallucination_detected>
+        <prediction>...</prediction>
+
+      Each supporting fact must be verified as present verbatim or in substance in one of the retrieved passages.
+      The final answer must follow strictly from the supporting facts alone — no outside knowledge is permitted.
+    input_vars: ["query", "retrieved_passages", "answer", "supporting_facts", "few_shots"]
+    output_vars: ["hallucination_detected", "hallucination_feedback", "prediction"]
+    tools: []
+    max_tool_calls: 0
+
+
+init_agent_prompt_pool:
+  retriever: [
+    "Retrieve passages.\n\nInputs:\n- Query: {query}\n\n<few_shots_section>\nHere are a few examples of expected behavior: {few_shots}\n</few_shots_section>\n\nInstructions: Use the available tools (list_passages, retrieve_passage_by_id) to find the most relevant passages. Return ONLY the passages, each with its title and full content, wrapped in a single <retrieved_passages> tag.\n\nOutput format:\n<retrieved_passages>...</retrieved_passages>",
+    "## Task Overview\nYou are to **select** the top relevant passages for the supplied query. No answering, just selection.\n\n### Steps\n1. Examine the `{query}`.\n2. Optionally consult the few-shot examples below.\n3. Call `list_passages` or `retrieve_passage_by_id` as needed.\n4. Gather the chosen passages (title + content).\n5. Emit them inside `<retrieved_passages>`.\n\n<few_shots_section>\nExamples illustrating good retrieval:\n{few_shots}\n</few_shots_section>\n\n**Expected XML**\n```xml\n<retrieved_passages>\n    <!-- each passage with its title and content -->\n</retrieved_passages>\n```",
+    "=== INPUTS ===\n| Variable   | Value |\n|------------|-------|\n| query      | {query} |\n\n<few_shots_section>\n| few_shots  | {few_shots} |\n</few_shots_section>=== END INPUTS ===\n\nTask: From the corpus, locate the most pertinent passages for the given query. Use the tools `list_passages` and `retrieve_passage_by_id` as required. Do **not** generate answers—only return the passages.\n\nReturn format must be exactly:\n<retrieved_passages>\n   ... (title and content of each passage) ...\n</retrieved_passages>",
+    "Instructions:\nYou will receive a {query} and possibly some {few_shots}. Your job is to pull the best matching passages.\n\n<few_shots_section>\nSample retrievals: {few_shots}\n</few_shots_section>\n\nProcedure:\n1. List candidate passages with `list_passages`.\n   ```json\n   <tool_call>{\"name\": \"list_passages\", \"arguments\": {\"query\": \"{{query}}\"}}</tool_call>\n   ```\n2. For each promising ID, fetch full text via `retrieve_passage_by_id`.\n   ```json\n   <tool_call>{\"name\": \"retrieve_passage_by_id\", \"arguments\": {\"id\": \"<ID>\"}}</tool_call>\n   ```\n3. Assemble the selected passages (title + content).\n4. Output them **exactly** inside a single `<retrieved_passages>` XML element.\n\nOutput schema:\n<retrieved_passages>...</retrieved_passages>",
+    "Imagine you are a research assistant whose sole responsibility right now is to gather evidence for a question.\n\nYour inputs are:\n{query}\n\n<few_shots_section>\nThese are illustration examples of what good retrieval looks like:\n{few_shots}\n</few_shots_section>\n\nUsing the corpus tools (`list_passages`, `retrieve_passage_by_id`), locate the passages that most directly address the query. Do not attempt to answer the query—just collect the texts.\n\nWhen you are finished, produce ONE XML block named `<retrieved_passages>` containing each passage verbatim, together with its title.\n\nExact required output:\n<retrieved_passages>\n  ...\n</retrieved_passages>",
+    "**Goal:** Pull the most relevant corpus passages for the provided query.\n\n- Input variables:\n  * Query string: `{query}`\n   <few_shots_section>\n * Few-shot examples: `{few_shots}`\n </few_shots_section>\n- Use the `list_passages` and `retrieve_passage_by_id` tools as needed.\n- Do **not** generate any answer text.\n\n**Output must be XML** with the following exact tag:\n```xml\n<retrieved_passages>\n  <!-- each passage with its title and full content -->\n</retrieved_passages>\n```"
+  ]
+
+  reader: [
+    "Instruction:\n- Examine each passage in {retrieved_passages} independently.\n- Pull out ONLY factual statements that directly address the {query}.\n- Each claim must be quoted exactly as it appears and prefixed with the passage index (starting at 1).\n- If {hallucination_feedback} contains any flagged items, omit those claims.\n\nInputs:\n{query}\n{retrieved_passages}\n{hallucination_feedback}\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\nOutput format (exactly as shown, no extra text):\n<passage_analysis>...</passage_analysis>",
+    "## Task Overview\nYou are given a user **query**, a collection of **retrieved passages**, optional **hallucination feedback**, and optionally a set of **few-shot examples**. Your job is to analyse each passage *in isolation* and pull out every fact that is verifiably grounded in that passage and relevant to the query.\n\n**Steps**\n1. Read the {query} to understand what information is being sought.\n2. For every passage listed in {retrieved_passages}:\n   - Identify sentences or fragments that answer or support the query.\n   - Quote the exact text and note the passage number.\n   - Exclude any claim that appears in {hallucination_feedback} as a hallucination.\n3. Compile all extracted facts into a single XML block.\n\n**Inputs**\n- Query: {query}\n- Passages: {retrieved_passages}\n- Hallucination feedback (may be empty): {hallucination_feedback}\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Required output**\nReturn ONLY the following XML element, with each fact on its own line inside the tags:\n```xml\n<passage_analysis>\n[Passage #] \"Exact fact text\"\n[Passage #] \"Exact fact text\"\n</passage_analysis>\n```",
+    "# Passage-Fact Extraction\n### Goal\nGiven a {query} and a list of {retrieved_passages}, produce a structured XML snippet that captures every passage-level fact pertinent to the query. If a previous {hallucination_feedback} note exists, do **not** include any flagged material.\n\n---\n**Procedure**\n1. **Read** the query.\n2. **Iterate** over each passage (index starts at 1). For each passage:\n   - Locate sentences that directly answer or back the query.\n   - Record the sentence verbatim, prefixed by its passage index.\n3. **Aggregate** all findings into one `<passage_analysis>` element.\n\n---\nInputs (in the order they appear below):\n{retrieved_passages}\n{query}\n{hallucination_feedback}\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Output Specification**\nYour response must be a single XML block:\n```xml\n<passage_analysis>\n[1] \"Fact from passage 1\"\n[2] \"Fact from passage 2\"\n...</passage_analysis>\n```",
+    "### Facts Extraction Prompt\n**Purpose**: Isolate verifiable statements from each retrieved document that address the user's {query}. These statements will later feed the answer-generation agent.\n\n| Section | Content |\n|---------|---------|\n| Query | {query} |\n| Passages | {retrieved_passages} |\n| Hallucination Feedback (optional) | {hallucination_feedback} |\n<few_shots_section>| Few-shot examples| \n{few_shots}\n</few_shots_section> |\n\n**Instructions**\n- Scan each passage independently.\n- Pull out any sentence or clause that is a *fact* answering the query.\n- Quote the text exactly and prepend the passage number in brackets, e.g., `[3] \"...\"`.\n- Discard any claim listed in {hallucination_feedback} as hallucinated.\n\n**Output**\nProvide a single XML element named `<passage_analysis>` containing one fact per line, formatted as shown above. No additional prose is allowed.\n\n```xml\n<passage_analysis>\n[1] \"...\"\n[2] \"...\"\n</passage_analysis>\n```",
+    "<!-- Brief Directive -->\nExtract grounded facts from each item in {retrieved_passages} that answer {query}. Omit anything mentioned in {hallucination_feedback}.\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Data Provided**\n{query}\n{retrieved_passages}\n{hallucination_feedback}\n\n**Return**\nExactly one XML tag:\n<passage_analysis>\n[PassageNumber] \"Exact fact\"\n[PassageNumber] \"Exact fact\"\n</passage_analysis>",
+    "### Overview\nYou will receive four pieces of data:\n1. **{query}** - the question we need to answer.\n2. **{retrieved_passages}** - a set of documents returned by the retriever.\n3. **{hallucination_feedback}** - optional notes indicating previously detected hallucinations.\n4. **{few_shots}** - optional example analyses.\n\nYour task is to **produce a passage-level factual analysis** that will be consumed by the next pipeline stage. Follow these rules:\n- Work on each passage **separately**; do not combine information across passages.\n- Only include statements that are **explicitly present** in the passage and that **directly relate** to the query.\n- If a statement appears in {hallucination_feedback} as a hallucination, **exclude it**.\n- Quote the statement verbatim and label it with its passage index (starting at 1).\n\n<few_shots_section>Few Shot Examples:\n{few_shots}\n</few_shots_section>\n\n**Output Requirement**\nYour answer must be a single XML element named `<passage_analysis>`. Inside, list each extracted fact on a new line, prefixed by the passage number in square brackets.\n\nExample of correct formatting (do NOT output the example itself, just follow the schema):\n```xml\n<passage_analysis>\n[1] \"Fact taken directly from passage 1\"\n[2] \"Fact taken directly from passage 2\"\n</passage_analysis>\n```"
+  ]
+
+  synthesizer: [
+    "Read the following data and produce a concise answer.\n\nInputs:\n- Query: {query}\n- Passage Analysis: {passage_analysis}\n\n<few_shots_section>Previous Examples:\n{few_shots}\n</few_shots_section>\n\nGenerate:\n- <answer>...</answer>\n- <supporting_facts>...</supporting_facts>\nMake sure each supporting fact mentions the exact passage title and sentence number. Do not add information not present in the analysis.",
+    "## Task Overview\nYou must synthesize a final answer by linking facts across the provided passage analysis.\n\n### Provided Data\n<query>\n{query}\n</query>\n\n<analysis>\n{passage_analysis}\n</analysis>\n\n<few_shots_section>\n<few_shot_examples>{few_shots}</few_shot_examples>\n</few_shots_section>\n\n### Instructions\n1. Identify all relevant facts needed for the answer.\n2. Ensure each fact cites its source as **\"{Passage Title} - Sentence {#}\"**.\n3. Compose the answer succinctly.\n\n### Required Output\nReturn exactly two XML elements:\n```xml\n<answer>...</answer>\n<supporting_facts>...</supporting_facts>\n```",
+    "### Inputs Table\n| Variable | Content |\n|----------|---------|\n| query | {query} |\n| passage_analysis | {passage_analysis} |\n\n<few_shots_section>\n| few_shots | {few_shots} |\n</few_shots_section>\n\n**Goal:** Combine the extracted facts to answer the query. Do not hallucinate.\n\n**Output Specification:**\n- `<answer>` element containing the final response.\n- `<supporting_facts>` element listing each fact, prefixed with its source title and sentence index.\nProvide ONLY these two XML tags, nothing else.",
+    "Produce a final answer with supporting citations.\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Steps**\n1. Examine the `{query}` and the `{passage_analysis}`.\n2. Pull out every sentence that directly answers or contributes to the answer.\n3. For each pulled sentence, note its passage title and sentence number.\n4. Write a concise `<answer>` and list the collected citations inside `<supporting_facts>`.\n\n**Data**\n- Query: {query}\n- Analysis: {passage_analysis}\n\n**Output**\nReturn exactly:\n```xml\n<answer>...</answer>\n<supporting_facts>...</supporting_facts>\n```",
+    "**Instruction**: Using the given query and the passage analysis, generate a single answer and enumerate the factual sources.\n\n**Inputs**\n- `{query}`\n- `{passage_analysis}`\n\n<few_shots_section>- Few Shots:\n{few_shots}\n</few_shots_section>\n\n**Output schema**\n```\n<answer>your answer here</answer>\n<supporting_facts>Fact 1 (Title - Sentence X); Fact 2 (Title - Sentence Y); …</supporting_facts>\n```\nOnly these tags may appear in the response.",
+    "Your role is to act as the synthesizer in a multi-agent QA pipeline. Connect the dots across the passage analysis and answer the user's query.\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n---\n**Data supplied**\n> Query: {query}\n>\n> Analysis JSON: {passage_analysis}\n---\n**What to do**\n- Read the analysis, locate every sentence that supports the answer.\n- Record each supporting sentence with its exact passage title and sentence index.\n- Write a clear `<answer>` and place all citations inside `<supporting_facts>`.\n\n**Response format** (must be XML):\n```xml\n<answer>...</answer>\n<supporting_facts>...</supporting_facts>\n```"
+  ]
+
+  hallucination_detector: [
+    "Task: Verify that the synthesizer's answer is completely grounded in the retrieved passages. Follow the steps and output XML tags.\n\nInputs:\n- Query: {query}\n- Retrieved Passages: {retrieved_passages}\n- Proposed Answer: {answer}\n- Supporting Facts (as cited by synthesizer): {supporting_facts}\n\n<few_shots_section>Few Shot Examples:\n{few_shots}\n</few_shots_section>\n\nInstructions:\n1. For every claim in the answer, check if a supporting fact appears verbatim or substantively in any retrieved passage.\n2. If any claim lacks grounding, set <hallucination_detected>true</hallucination_detected> and provide a <hallucination_feedback> describing the ungrounded claim and which passage should be consulted.</hallucination_feedback>.\n3. If all claims are grounded, set <hallucination_detected>false</hallucination_detected> and place the original answer inside <prediction>...</prediction>.\n\nOutput must be exactly XML tags as described, no extra text.",
+    "## Verification Prompt\n\nBelow are the components you will work with. Do **not** modify the placeholder syntax.\n\n### Data\n```\nQuery: {query}\nRetrieved Passages:\n{retrieved_passages}\nAnswer:\n{answer}\nSupporting Facts:\n{supporting_facts}\n```\n\n<few_shots_section>Previous Exmaples:\n{few_shots}\n</few_shots_section>\n\n### What to do\n- Examine each supporting fact and locate it in the retrieved passages (exact wording or paraphrase allowed).\n- Determine if the answer relies only on these grounded facts.\n- Produce XML output:\n  - `<hallucination_detected>` must be `true` or `false`.\n  - If `true`, include a `<hallucination_feedback>` element explaining which claim is unsupported and point to the appropriate passage.\n  - If `false`, include the full verified answer inside `<prediction>`.\n\n**Output format example**\n```xml\n<hallucination_detected>false</hallucination_detected>\n<prediction>Your fully grounded answer here.</prediction>\n```\nOnly the XML tags listed may appear.",
+    "**Goal**: Confirm that every statement in the synthesizer's `answer` is backed by the `retrieved_passages` using the provided `supporting_facts`.\n\n**Procedure**\n- ✅ Scan the `supporting_facts` list.\n- ✅ For each fact, search the `retrieved_passages` for a matching passage (verbatim or semantically equivalent).\n- ✅ Flag any fact that cannot be found.\n- ✅ If any flag appears, output hallucination details; otherwise output the verified answer.\n\n**Inputs**\n{query}\n--- \nPassages:\n{retrieved_passages}\n--- \nAnswer:\n{answer}\n--- \nFacts:\n{supporting_facts}\n--- \n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n**Expected XML output**\n- `<hallucination_detected>` (`true`/`false`)\n- If true → `<hallucination_feedback>` with claim & passage reference.\n- If false → `<prediction>` containing the original answer.",
+    "1. Read the following sections carefully; placeholders will be replaced at runtime.\n\n<query>{query}</query>\n<retrieved_passages>{retrieved_passages}</retrieved_passages>\n<answer>{answer}</answer>\n<supporting_facts>{supporting_facts}</supporting_facts>\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n2. Verify each supporting fact against the retrieved passages.\n3. If any fact is missing, produce:\n   <hallucination_detected>true</hallucination_detected>\n   <hallucination_feedback>Explain the unmapped claim and suggest the correct passage.</hallucination_feedback>\n4. If all facts are present, produce:\n   <hallucination_detected>false</hallucination_detected>\n   <prediction>{answer}</prediction>\n\nReturn **only** the XML elements shown; no additional commentary.",
+    "Task: Ground the answer.\n\n| Variable | Placeholder |\n|----------|-------------|\n| Query | {query} |\n| Passages | {retrieved_passages} |\n| Answer | {answer} |\n| Facts | {supporting_facts} |\n\n<few_shots_section>| Few-shot examples | {few_shots} |\n{few_shots}\n</few_shots_section>\n\nCheck that every claim in `{answer}` is supported by `{retrieved_passages}` via the `{supporting_facts}`. Output XML:\n- `<hallucination_detected>` = true → also `<hallucination_feedback>` with claim & missing passage.\n- `<hallucination_detected>` = false → `<prediction>` containing the original answer.",
+    "### Input Section (do not edit placeholders)\n\n{query}\n{retrieved_passages}\n{answer}\n{supporting_facts}\n\n<few_shots_section>\n{few_shots}\n</few_shots_section>\n\n### Verification Logic\n- For each item in `{supporting_facts}`, ensure it appears (exactly or substantively) in one of the `{retrieved_passages}`.\n- If any fact cannot be located, set `<hallucination_detected>true</hallucination_detected>` and fill `<hallucination_feedback>` with: *Claim*: <claim>, *Suggested passage*: <passage_id or snippet>.\n- If all are located, set `<hallucination_detected>false</hallucination_detected>` and copy the full `{answer}` into `<prediction>`.\n\n### Output Specification\nProvide **only** the following XML tags (order does not matter):\n```xml\n<hallucination_detected>true|false</hallucination_detected>\n<hallucination_feedback>...</hallucination_feedback>   <!-- only if true -->\n<prediction>...</prediction>                           <!-- only if false -->\n```"
+  ]

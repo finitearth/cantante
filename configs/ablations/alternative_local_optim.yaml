@@ -1,0 +1,46 @@
+experiment:
+  name: "node_optim"
+  output_dir: "./results/ablations/alternative_local_optim/"
+  seed: 42
+  max_token_budget: 10000000
+  optimizer: "CANTANTE"
+  node_optimizer: "EvoPrompt" # ALTERNATIVE NODE OPTIMIZER
+  selector: "naive"
+  block_size: 30
+  eval_strategy: "subsample"
+  attributer: "unconstrained"
+  eval_timeout_sec: 180
+  recursion_limit: 30
+  dataset: "gsm8k"
+  max_tokens_per_field: 128
+  n_steps: 100 # stopped by callbacks
+
+optimizer_kwargs:
+  crossovers_per_iter: 3
+
+attributer_kwargs:
+  group_size: 3
+
+task_llm_kwargs:
+  model: "qwen-30b-a3b-llmlb"
+  base_url: "https://openwebui.uni-freiburg.de/api"
+  model_provider: "openai"
+  max_tokens: 512
+  temperature: 0.7
+  requests_per_second: 4
+  max_bucket_size: 4
+  timeout: 100
+  max_retries: 3
+
+meta_llm_kwargs:
+  model: "gpt-oss-120b-llmlb"
+  base_url: "https://openwebui.uni-freiburg.de/api"
+  model_provider: "openai"
+  max_tokens: 4096
+  temperature: 0.1
+  requests_per_second: 2
+  max_bucket_size: 1
+  timeout: 180
+  max_retries: 3
+
+setup_dict_folder: "configs/setups"

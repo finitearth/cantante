@@ -1,0 +1,33 @@
+\begin{wraptable}{r}{0.45\textwidth}
+  \centering
+  \caption{Ablation results on GSM8K (Seed 42). Test accuracy (\%) for configurations selected by development-set performance.}
+  \label{tab:ablations}
+  \renewcommand{\arraystretch}{1}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{Configuration} & \textbf{$\Delta$ Score} \\
+    \midrule
+    Default setting & 84.00 \\
+    \midrule
+    \textit{Identity Attribution} &  \\
+    \hspace{1em}Equal Steps & $-$\,13.40 \\
+    \hspace{1em}Equal Budget & $-$\,\phantom{0}4.40 \\
+    \midrule
+    \textit{Attribution component} &  \\
+    \hspace{1em}alt. Prompt & $+$\,\phantom{0}0.60 \\
+    \hspace{1em}alt. Model & $+$\,\phantom{0}0.20 \\
+    \midrule
+    \textit{Prompt optimizer} &  \\
+    \hspace{1em}w/ Few-Shots & $-$\,\phantom{0}9.20 \\
+    \hspace{1em}alt. Optimizer & $+$\,\phantom{0}3.20 \\
+    \midrule
+    \textit{Group size} &  \\
+    \hspace{1em}g = 2 & $-$\,54.40 \\
+    \hspace{1em}g = 5 & $+$\,\phantom{0}0.80 \\
+    \midrule
+    \textit{Dataset size} &  \\
+    \hspace{1em}|DS| = \phantom{0}75 & $-$\,\phantom{0}2.80 \\
+    \hspace{1em}|DS| = 150 & $-$\,\phantom{0}3.40 \\
+    \bottomrule
+  \end{tabular}
+\end{wraptable}

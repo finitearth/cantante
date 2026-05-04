@@ -1,0 +1,21 @@
+\begin{table}[h]
+  \centering
+  \caption{Test accuracy (\%) averaged over three seeds ($\pm$std). \textbf{Bold: best}, \underline{underlined: second-best} per benchmark. Average rank computed across benchmarks and seeds. Bottom rows show \alg's absolute gain over the initial prompt and best baseline.}
+  \label{tab:main-results}
+  \renewcommand{\arraystretch}{1}
+  \resizebox{0.85\textwidth}{!}{%
+  \begin{tabular}{llllc}
+    \toprule
+    \textbf{Optimizer} & \textbf{MBPP} & \textbf{GSM8K} & \textbf{HotpotQA} & \textbf{Avg Rank} \\
+    \midrule
+    Initial & \phantom{0}5.54\,$_{\pm\phantom{0}1.62}$ & 59.20\,$_{\pm10.73}$ & \phantom{0}9.67\,$_{\pm\phantom{0}3.00}$ & 3.44 \\
+    GEPA & \underline{22.96}\,$_{\pm18.30}$ & 61.27\,$_{\pm\phantom{0}2.66}$ & 10.93\,$_{\pm\phantom{0}3.91}$ & 2.67 \\
+    MIPROv2 & 18.42\,$_{\pm14.13}$ & \underline{69.80}\,$_{\pm\phantom{0}7.10}$ & \textbf{14.20}\,$_{\pm\phantom{0}5.72}$ & \underline{2.33} \\
+    \midrule
+    \alg{} (ours) & \textbf{41.89}\,$_{\pm\phantom{0}7.56}$ & \textbf{82.33}\,$_{\pm\phantom{0}4.35}$ & \underline{11.93}\,$_{\pm\phantom{0}5.06}$ & \textbf{1.44} \\
+    $\Delta$ vs. Initial & \textcolor{cbGreen}{36.35} & \textcolor{cbGreen}{23.13} & \textcolor{cbGreen}{2.27} & \textcolor{cbGreen}{-2.00} \\
+    $\Delta$ vs. Best & \textcolor{cbGreen}{18.93} & \textcolor{cbGreen}{12.53} & \textcolor{cbOrange}{-2.27} & \textcolor{cbGreen}{-0.89} \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
